@@ -1,6 +1,28 @@
 # 🎟️ TicketFlow — Ticket Booking System
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-black?logo=vercel)](https://ticket-booking-system-ten-sable.vercel.app/)
+[![Backend API](https://img.shields.io/badge/Backend%20API-Render-46E3B7?logo=render)](https://ticket-booking-system-1-3lg3.onrender.com/docs)
+
+> 🌐 **Live Site:** [https://ticket-booking-system-ten-sable.vercel.app/](https://ticket-booking-system-ten-sable.vercel.app/)
+> 🔌 **Backend API:** [https://ticket-booking-system-1-3lg3.onrender.com](https://ticket-booking-system-1-3lg3.onrender.com) | [Swagger Docs](https://ticket-booking-system-1-3lg3.onrender.com/docs)
+>
+> ⚠️ **Note:** The backend is hosted on Render's free tier and may take **30–60 seconds** to wake up on the first request after a period of inactivity.
+
+
 A premium, full-stack movie and concert ticket booking platform featuring real-time interactive seat maps, concurrency-protected seat holds (TTL), queue-based waitlists, email ticket delivery with embedded QR codes, and a secure 2FA/OTP login system.
+
+---
+
+## 📸 Screenshots
+
+### 🏠 Home — Browse Events & Trending Carousel
+![Homepage](docs/screenshots/homepage.png)
+
+### 🔐 Login — Two-Step OTP Authentication
+![Login Page](docs/screenshots/login.png)
+
+### 📝 Register — Role-Based Account Creation
+![Register Page](docs/screenshots/register.png)
 
 ---
 
