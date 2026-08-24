@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     FROM_EMAIL: str = "noreply@ticketbooking.example.com"
     
+    # Frontend Base URL (used for links in emails)
+    FRONTEND_URL: str = "http://localhost:8000"
+    
     class Config:
         env_file = ".env"
         extra = "ignore"

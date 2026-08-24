@@ -105,7 +105,7 @@ def process_seat_release(db: Session, show_id: int, seat: ShowSeat):
         expiry_str = expiry.strftime("%Y-%m-%d %H:%M:%S UTC")
         
         # In a real app, this URL points to the frontend page
-        claim_url = f"http://localhost:8000/frontend/pages/seat-select.html?show_id={show_id}&claim_waitlist={next_entry.id}"
+        claim_url = f"{settings.FRONTEND_URL}/frontend/pages/seat-select.html?show_id={show_id}&claim_waitlist={next_entry.id}"
         
         send_waitlist_offer(
             to_email=customer.email,
