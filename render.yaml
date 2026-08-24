@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: ticket-booking-system-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # Set manually in Render dashboard
+      - key: SECRET_KEY
+        sync: false  # Set manually in Render dashboard
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 1440
+      - key: SEAT_HOLD_TTL_MINUTES
+        value: 10
+      - key: WAITLIST_OFFER_TTL_MINUTES
+        value: 5
+      - key: EMAIL_PROVIDER
+        value: console
+      - key: FRONTEND_URL
+        sync: false  # Set to your Render service URL after first deploy
