@@ -20,4 +20,4 @@ services:
       - key: EMAIL_PROVIDER
         value: console
       - key: FRONTEND_URL
-        sync: false  # Set to your Render service URL after first deploy
+        value: https://ticket-booking-system-1-3lg3.onrender.com

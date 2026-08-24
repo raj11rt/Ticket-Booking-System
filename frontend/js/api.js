@@ -17,7 +17,7 @@ const getApiBaseUrl = () => {
 
     // 4. Standalone Vercel deployment: fallback to the deployed Render backend URL
     // REPLACE this with your actual Render backend service URL after deploying it
-    return "https://ticket-booking-system-backend.onrender.com";
+    return "https://ticket-booking-system-1-3lg3.onrender.com";
 };
 
 const API_BASE = getApiBaseUrl();
