@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - TicketFlow</title>
+    <link rel="stylesheet" href="/frontend/css/styles.css">
+    <style>
+        .venue-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(109,40,217,0.04);
+            transition: all 0.25s;
+        }
+        .venue-card:hover {
+            border-color: var(--border-hover);
+            box-shadow: 0 6px 20px rgba(109,40,217,0.09);
+        }
+        .venue-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 12px;
+            margin-top: 12px;
+            color: var(--text-muted);
+        }
+        .venue-stat strong { color: var(--text-main); }
+        .row-selector-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-inset);
+            padding: 9px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        .row-selector-item strong { color: var(--text-main); font-size: 14px; }
+    </style>
+</head>
+<body>
+    <header></header>
+
+    <div class="container">
+        <h1 style="margin-bottom: 8px; font-family: 'Outfit';">Admin Panel</h1>
+        <p style="color: var(--text-muted); margin-bottom: 40px;">Configure physical venues and initialize their grid seat layout templates.</p>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:40px; align-items:start;">
+
+            <!-- Left: Registered Venues -->
+            <div>
+                <h2 class="section-title">Registered Venues</h2>
+                <div id="venuesList" style="display:flex; flex-direction:column; gap:16px;">
+                    <div class="card" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                        Loading venues...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Create Venue Form -->
+            <div>
+                <div class="card">
+                    <h2 style="margin-bottom: 22px; font-family: 'Outfit'; font-size: 20px;">➕ Create Venue &amp; Seat Grid</h2>
+                    <form id="createVenueForm">
+                        <div class="form-group">
+                            <label for="venueName">Venue Name</label>
+                            <input type="text" id="venueName" class="form-control" placeholder="e.g. IMAX Hall 1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="venueAddress">Address</label>
+                            <input type="text" id="venueAddress" class="form-control" placeholder="e.g. 5th Avenue Mall, Floor 3" required>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label for="numRows">Number of Rows</label>
+                                <input type="number" id="numRows" class="form-control" min="1" max="15" placeholder="e.g. 6" required oninput="generateCategorySelectors()">
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label for="numCols">Seats Per Row</label>
+                                <input type="number" id="numCols" class="form-control" min="1" max="20" placeholder="e.g. 10" required>
+                            </div>
+                        </div>
+
+                        <div id="rowCategoriesSection" style="margin-bottom:25px; display:none; border-top:1px solid var(--border-color); padding-top:16px;">
+                            <label style="display:block; color:var(--text-muted); font-size:11px; margin-bottom:12px; font-weight:700; text-transform:uppercase; letter-spacing:1px;">
+                                Assign Category per Row
+                            </label>
+                            <div id="rowCategorySelectorsContainer" style="display:flex; flex-direction:column; gap:8px;">
+                                <!-- Dynamic rows -->
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px;">
+                            Save Venue &amp; Seat Grid
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/frontend/js/api.js"></script>
+    <script>
+        async function initAdmin() {
+            const role = api.getUserRole();
+            if (role !== "admin") {
+                toast.error("Access denied. Admin credentials required.");
+                setTimeout(() => { window.location.href = "/frontend/index.html"; }, 1500);
+                return;
+            }
+            await loadVenues();
+        }
+
+        async function loadVenues() {
+            const list = document.getElementById("venuesList");
+            try {
+                const venues = await api.get("/venues");
+                if (venues.length === 0) {
+                    list.innerHTML = `
+                        <div class="card" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                            No venues registered yet. Use the form to add one.
+                        </div>`;
+                    return;
+                }
+                let html = "";
+                for (const v of venues) {
+                    const seats = await api.get(`/venues/${v.id}/seats`);
+                    const cats = [...new Set(seats.map(s => s.category))].join(", ");
+                    html += `
+                        <div class="venue-card">
+                            <h3 style="margin-bottom: 4px; font-size: 17px;">🏛️ ${v.name}</h3>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 0;">📍 ${v.address}</p>
+                            <div class="venue-stat">
+                                <span>Total Seats: <strong>${seats.length}</strong></span>
+                                <span>Categories: <strong>${cats || 'None'}</strong></span>
+                            </div>
+                        </div>`;
+                }
+                list.innerHTML = html;
+            } catch (err) {
+                toast.error("Failed to load venues: " + err.message);
+            }
+        }
+
+        function generateCategorySelectors() {
+            const numRows = parseInt(document.getElementById("numRows").value);
+            const container = document.getElementById("rowCategorySelectorsContainer");
+            const section = document.getElementById("rowCategoriesSection");
+
+            if (isNaN(numRows) || numRows < 1) { section.style.display = "none"; return; }
+
+            let html = "";
+            for (let i = 0; i < numRows; i++) {
+                const label = String.fromCharCode(65 + i);
+                const defaultVal = i < 2 ? "Premium" : "Standard";
+                html += `
+                    <div class="row-selector-item">
+                        <strong>Row ${label}</strong>
+                        <select class="form-control row-category-select" data-row="${label}" style="width:140px; padding:7px 12px; font-size:13px;">
+                            <option value="Standard" ${defaultVal === "Standard" ? "selected" : ""}>Standard</option>
+                            <option value="Premium" ${defaultVal === "Premium" ? "selected" : ""}>Premium</option>
+                        </select>
+                    </div>`;
+            }
+            container.innerHTML = html;
+            section.style.display = "block";
+        }
+
+        document.getElementById("createVenueForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const name = document.getElementById("venueName").value;
+            const address = document.getElementById("venueAddress").value;
+            const numRows = parseInt(document.getElementById("numRows").value);
+            const numCols = parseInt(document.getElementById("numCols").value);
+
+            const seats = [];
+            document.querySelectorAll(".row-category-select").forEach(select => {
+                const rowLabel = select.getAttribute("data-row");
+                const category = select.value;
+                for (let c = 1; c <= numCols; c++) seats.push({ row_label: rowLabel, col_number: c, category });
+            });
+
+            try {
+                await api.post("/venues", { name, address, seats });
+                toast.success("Venue & seat grid layout saved successfully!");
+                document.getElementById("createVenueForm").reset();
+                document.getElementById("rowCategoriesSection").style.display = "none";
+                await loadVenues();
+            } catch (err) {
+                toast.error(err.message || "Failed to create venue");
+            }
+        });
+
+        document.addEventListener("DOMContentLoaded", () => { initAdmin(); });
+    </script>
+</body>
+</html>

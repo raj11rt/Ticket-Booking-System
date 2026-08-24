@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Seats - TicketFlow</title>
+    <link rel="stylesheet" href="/frontend/css/styles.css">
+    <style>
+        .row-label-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--text-muted);
+            font-size: 12px;
+            width: 32px;
+            height: 32px;
+        }
+        .checkout-section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 14px;
+            font-family: 'Outfit', sans-serif;
+        }
+        .seat-item-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-strong);
+        }
+        .seat-item-row:last-child { border-bottom: none; }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 700;
+            font-size: 18px;
+            border-top: 2px solid var(--border-color);
+            padding-top: 14px;
+            margin-top: 4px;
+            margin-bottom: 20px;
+            color: var(--text-main);
+        }
+        .total-row .total-amount { color: var(--primary); }
+
+        /* Waitlist status */
+        .wl-offer-box {
+            background: var(--success-bg);
+            border: 1.5px solid var(--success);
+            padding: 14px;
+            border-radius: 12px;
+            margin-top: 16px;
+        }
+        .wl-offer-title { color: var(--success); font-weight: 700; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <header></header>
+
+    <div class="container">
+        <a href="/frontend/index.html" class="btn btn-secondary" style="margin-bottom: 24px;" onclick="releaseAllHolds()">← Back to Events</a>
+
+        <h1 id="showTitle" style="margin-bottom: 8px; font-family: 'Outfit';">Select Your Seats</h1>
+        <p id="showSubtitle" style="color: var(--text-muted); margin-bottom: 30px;"></p>
+
+        <div class="seat-map-wrapper">
+            <!-- Left: Seat Map -->
+            <div style="flex-grow: 1;">
+                <div class="seat-legend">
+                    <div class="legend-item"><div class="seat-sample available"></div> Available</div>
+                    <div class="legend-item"><div class="seat-sample held mine"></div> Selected (Yours)</div>
+                    <div class="legend-item"><div class="seat-sample held"></div> Held by others</div>
+                    <div class="legend-item"><div class="seat-sample booked"></div> Booked</div>
+                </div>
+
+                <div class="seat-grid-container">
+                    <div class="screen">STAGE / SCREEN</div>
+                    <div id="seatGrid" class="seat-grid">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Checkout / Waitlist Panel -->
+            <div class="checkout-panel">
+                <!-- Hold Timer -->
+                <div id="holdTimerBox" class="timer" style="display: none;">
+                    ⏳ Hold Expires in: <span id="countdown">10:00</span>
+                </div>
+
+                <!-- Checkout Card -->
+                <div id="checkoutCard" class="card" style="display: none; margin-bottom: 20px;">
+                    <p class="checkout-section-title">🛒 Order Summary</p>
+                    <div id="selectedSeatsList" style="display:flex; flex-direction:column; margin-bottom: 12px;">
+                        <!-- Selected seats listed here -->
+                    </div>
+                    <div class="total-row">
+                        <span>Total:</span>
+                        <span id="totalPrice" class="total-amount">$0.00</span>
+                    </div>
+                    <button id="bookBtn" class="btn btn-primary" style="width:100%; justify-content:center; padding:13px;" onclick="confirmBooking()">
+                        Confirm Booking
+                    </button>
+                    <button class="btn btn-secondary" style="width:100%; justify-content:center; margin-top:10px; padding:10px;" onclick="releaseAllHolds()">
+                        Cancel Hold
+                    </button>
+                </div>
+
+                <!-- Waitlist Card -->
+                <div id="waitlistCard" class="card" style="margin-bottom: 20px;">
+                    <p class="checkout-section-title">⏳ Sold Out? Join Waitlist</p>
+                    <p style="color: var(--text-muted); font-size: 13px; line-height: 1.5; margin-bottom: 16px;">
+                        If the category you want is sold out, join the queue. You'll be automatically offered a seat when a booking is cancelled.
+                    </p>
+                    <div class="form-group">
+                        <label for="waitlistCategory">Seat Category</label>
+                        <select id="waitlistCategory" class="form-control">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <button class="btn btn-accent" style="width: 100%; justify-content: center; padding: 10px;" onclick="joinWaitlist()">
+                        Join Queue
+                    </button>
+                </div>
+
+                <!-- Waitlist Status Card -->
+                <div id="waitlistStatusCard" class="card" style="display: none; border-color: var(--secondary);">
+                    <p class="checkout-section-title" style="color: var(--secondary);">📋 Your Waitlist Status</p>
+                    <div style="font-size: 14px; line-height: 1.7;">
+                        <p>Status: <strong id="wlStatusText" style="color: var(--primary); text-transform: uppercase;"></strong></p>
+                        <p id="wlPositionText">Queue Position: <strong style="color: var(--text-main);"></strong></p>
+
+                        <div id="wlOfferBox" class="wl-offer-box" style="display: none;">
+                            <p class="wl-offer-title">🎉 Seat Offered!</p>
+                            <p style="margin-bottom:4px;">Seat: <strong id="wlOfferedSeatLabel" style="color: var(--text-main);"></strong></p>
+                            <p style="margin-bottom:12px;">Expires in: <strong id="wlOfferExpiry" style="color: var(--warning);"></strong></p>
+                            <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="claimWaitlistOffer()">
+                                Claim Seat Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/frontend/js/api.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const showId = urlParams.get("show_id");
+        const claimWaitlistId = urlParams.get("claim_waitlist");
+
+        let seatsData = [];
+        let pollingInterval = null;
+        let timerInterval = null;
+        let holdExpiryTime = null;
+        let categories = new Set();
+        let myHeldSeats = [];
+        let waitlistEntry = null;
+
+        async function initPage() {
+            if (!showId) { toast.error("Show ID is missing in URL"); return; }
+
+            const role = api.getUserRole();
+            if (!role) {
+                toast.info("Please login to select and book tickets.");
+                setTimeout(() => { window.location.href = `/frontend/pages/login.html`; }, 1500);
+                return;
+            }
+
+            try {
+                const show = await api.get(`/shows/${showId}`);
+                document.getElementById("showTitle").innerText = `Book Tickets: ${show.event_title}`;
+                document.getElementById("showSubtitle").innerText = `🏛️ ${show.venue_name}   📅 ${show.date}   ⏰ ${show.time}`;
+                document.title = `${show.event_title} – Select Seats | TicketFlow`;
+
+                await fetchSeatMap();
+                pollingInterval = setInterval(fetchSeatMap, 3000);
+                await fetchWaitlistStatus();
+
+                if (claimWaitlistId) { toast.info("Checking your waitlist offer details..."); }
+            } catch (err) {
+                toast.error("Error loading show details: " + err.message);
+            }
+        }
+
+        async function fetchSeatMap() {
+            try {
+                const data = await api.get(`/shows/${showId}/seats`);
+                seatsData = data;
+                renderSeatMap();
+                updateCheckoutPanel();
+            } catch (err) {
+                console.error("Error fetching seat map:", err);
+            }
+        }
+
+        function renderSeatMap() {
+            const grid = document.getElementById("seatGrid");
+            const rows = [...new Set(seatsData.map(s => s.row_label))].sort();
+            const cols = [...new Set(seatsData.map(s => s.col_number))].sort((a, b) => a - b);
+
+            // Populate waitlist category options
+            const categorySelect = document.getElementById("waitlistCategory");
+            const currentSelectedCategory = categorySelect.value;
+            const uniqueCategories = [...new Set(seatsData.map(s => s.category))];
+            if (uniqueCategories.length !== categories.size) {
+                categories = new Set(uniqueCategories);
+                categorySelect.innerHTML = uniqueCategories.map(cat => `<option value="${cat}">${cat}</option>`).join("");
+                if (currentSelectedCategory && uniqueCategories.includes(currentSelectedCategory)) {
+                    categorySelect.value = currentSelectedCategory;
+                }
+            }
+
+            grid.style.gridTemplateColumns = `32px repeat(${cols.length}, 32px)`;
+
+            let html = "";
+            for (const r of rows) {
+                html += `<div class="row-label-cell">${r}</div>`;
+                for (const c of cols) {
+                    const seat = seatsData.find(s => s.row_label === r && s.col_number === c);
+                    if (seat) {
+                        let statusClass = seat.status;
+                        if (seat.status === "held" && seat.is_mine) statusClass = "held mine";
+                        html += `
+                            <div class="seat ${statusClass}"
+                                 title="Seat ${seat.row_label}-${seat.col_number} (${seat.category}) — $${seat.price.toFixed(2)}"
+                                 onclick="handleSeatClick(${seat.id}, '${seat.status}', ${seat.is_mine})">
+                                ${seat.col_number}
+                            </div>`;
+                    } else {
+                        html += `<div></div>`;
+                    }
+                }
+            }
+            grid.innerHTML = html;
+        }
+
+        async function handleSeatClick(seatId, status, isMine) {
+            if (waitlistEntry && waitlistEntry.status === "offered" && waitlistEntry.offered_seat_id !== seatId) {
+                toast.error("You have a pending waitlist offer. Please claim it or wait for it to expire.");
+                return;
+            }
+            if (status === "available") {
+                try {
+                    await api.post(`/shows/${showId}/seats/hold`, { seat_ids: [seatId] });
+                    toast.success("Seat added to your hold.");
+                    await fetchSeatMap();
+                } catch (err) { toast.error(err.message); }
+            } else if (status === "held" && isMine) {
+                releaseAllHolds();
+            } else {
+                toast.error("This seat is currently unavailable.");
+            }
+        }
+
+        function updateCheckoutPanel() {
+            myHeldSeats = seatsData.filter(s => s.status === "held" && s.is_mine);
+            const timerBox = document.getElementById("holdTimerBox");
+            const checkoutCard = document.getElementById("checkoutCard");
+            const list = document.getElementById("selectedSeatsList");
+            const totalText = document.getElementById("totalPrice");
+
+            if (myHeldSeats.length === 0) {
+                timerBox.style.display = "none";
+                checkoutCard.style.display = "none";
+                clearInterval(timerInterval);
+                return;
+            }
+
+            checkoutCard.style.display = "block";
+            let total = 0.0;
+            list.innerHTML = myHeldSeats.map(s => {
+                total += s.price;
+                return `
+                    <div class="seat-item-row">
+                        <span>Seat ${s.row_label}-${s.col_number} <span style="color:var(--text-muted); font-size:12px;">(${s.category})</span></span>
+                        <span>$${s.price.toFixed(2)}</span>
+                    </div>`;
+            }).join("");
+
+            totalText.innerText = `$${total.toFixed(2)}`;
+
+            const minExpiry = Math.min(...myHeldSeats.map(s => s.hold_expires_in_seconds).filter(s => s != null));
+            if (minExpiry && minExpiry > 0) {
+                timerBox.style.display = "flex";
+                holdExpiryTime = Date.now() + (minExpiry * 1000);
+                clearInterval(timerInterval);
+                runCountdown();
+                timerInterval = setInterval(runCountdown, 1000);
+            }
+        }
+
+        function runCountdown() {
+            const secondsLeft = Math.max(0, Math.round((holdExpiryTime - Date.now()) / 1000));
+            const mins = Math.floor(secondsLeft / 60);
+            const secs = secondsLeft % 60;
+            document.getElementById("countdown").innerText = `${mins}:${secs.toString().padStart(2, '0')}`;
+            if (secondsLeft <= 0) {
+                clearInterval(timerInterval);
+                document.getElementById("holdTimerBox").style.display = "none";
+                document.getElementById("checkoutCard").style.display = "none";
+                toast.error("Your seat holds have expired.");
+                fetchSeatMap();
+            }
+        }
+
+        async function releaseAllHolds() {
+            try {
+                await api.delete(`/shows/${showId}/seats/hold`);
+                toast.info("Seat holds cancelled.");
+                await fetchSeatMap();
+            } catch (err) { console.error(err); }
+        }
+
+        async function confirmBooking() {
+            const seatIds = myHeldSeats.map(s => s.id);
+            if (seatIds.length === 0) return;
+
+            const bookBtn = document.getElementById("bookBtn");
+            bookBtn.disabled = true;
+            bookBtn.innerText = "Processing...";
+
+            try {
+                let url = `/bookings?show_id=${showId}`;
+                if (waitlistEntry && waitlistEntry.status === "offered") url += `&claim_waitlist_id=${waitlistEntry.id}`;
+
+                const res = await api.post(url, { seat_ids: seatIds });
+                toast.success(res.message || "Booking confirmed! Ticket QR code sent via email.");
+                clearInterval(pollingInterval);
+                clearInterval(timerInterval);
+                setTimeout(() => { window.location.href = "/frontend/pages/bookings.html"; }, 2000);
+            } catch (err) {
+                toast.error(err.message || "Booking failed");
+                bookBtn.disabled = false;
+                bookBtn.innerText = "Confirm Booking";
+            }
+        }
+
+        async function joinWaitlist() {
+            const category = document.getElementById("waitlistCategory").value;
+            try {
+                const res = await api.post(`/shows/${showId}/waitlist`, { category });
+                toast.success(res.message || "Successfully joined waitlist queue!");
+                await fetchWaitlistStatus();
+            } catch (err) { toast.error(err.message || "Failed to join waitlist"); }
+        }
+
+        async function fetchWaitlistStatus() {
+            try {
+                const res = await api.get(`/shows/${showId}/waitlist/status`);
+                const card = document.getElementById("waitlistStatusCard");
+
+                if (res.status === "none") { card.style.display = "none"; waitlistEntry = null; return; }
+
+                waitlistEntry = res;
+                card.style.display = "block";
+                document.getElementById("wlStatusText").innerText = res.status;
+
+                const posText = document.getElementById("wlPositionText");
+                const offerBox = document.getElementById("wlOfferBox");
+
+                if (res.status === "waiting") {
+                    posText.style.display = "block";
+                    posText.querySelector("strong").innerText = `#${res.position}`;
+                    offerBox.style.display = "none";
+                } else if (res.status === "offered") {
+                    posText.style.display = "none";
+                    offerBox.style.display = "block";
+                    document.getElementById("wlOfferedSeatLabel").innerText = res.offered_seat_label;
+                    if (res.offer_expires_at) {
+                        const expiryDate = new Date(res.offer_expires_at + "Z");
+                        const diffMs = expiryDate - new Date();
+                        document.getElementById("wlOfferExpiry").innerText = diffMs > 0 ? `${Math.floor(diffMs / 60000)} mins` : "expired";
+                    }
+                } else {
+                    posText.style.display = "none";
+                    offerBox.style.display = "none";
+                }
+            } catch (err) { console.error("Error fetching waitlist status:", err); }
+        }
+
+        async function claimWaitlistOffer() {
+            if (!waitlistEntry || !waitlistEntry.offered_seat_id) return;
+            try {
+                await api.post(`/shows/${showId}/seats/hold`, { seat_ids: [waitlistEntry.offered_seat_id] });
+                await fetchSeatMap();
+                toast.success("Offered seat added to hold. Confirm checkout to finish booking!");
+            } catch (err) { toast.error("Could not hold offered seat: " + err.message); }
+        }
+
+        window.onbeforeunload = () => { if (myHeldSeats.length > 0) releaseAllHolds(); };
+        document.addEventListener("DOMContentLoaded", () => { initPage(); });
+    </script>
+</body>
+</html>

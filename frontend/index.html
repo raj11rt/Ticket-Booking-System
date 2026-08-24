@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TicketFlow — Book Movie & Concert Tickets</title>
+    <meta name="description" content="Book seats for trending movies and live concerts with real-time interactive seat maps. Join waitlists for sold-out events and receive instant ticket delivery.">
+    <link rel="stylesheet" href="/frontend/css/styles.css">
+    <style>
+        /* ---- Poster gradient fallbacks per type ---- */
+        .poster-movie    { background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #7c3aed 100%); }
+        .poster-concert  { background: linear-gradient(135deg, #78350f 0%, #c2410c 50%, #f97316 100%); }
+        .poster-default  { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0ea5e9 100%); }
+
+        /* ---- Hero badge ---- */
+        .hero-badges {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            background: rgba(124, 58, 237, 0.08);
+            color: var(--primary);
+            border: 1px solid rgba(124, 58, 237, 0.15);
+        }
+
+        /* search bar override */
+        .search-filter-bar input,
+        .search-filter-bar select {
+            background: white;
+        }
+
+        /* section divider */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .view-all-link {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .view-all-link:hover { text-decoration: underline; }
+
+        .events-loading-msg {
+            grid-column: 1/-1;
+            text-align: center;
+            color: var(--text-muted);
+            padding: 60px;
+        }
+    </style>
+</head>
+<body>
+    <header></header>
+
+    <div class="container">
+        <!-- Hero -->
+        <section class="hero">
+            <div class="hero-badges">
+                <span class="hero-badge">🎬 Movies</span>
+                <span class="hero-badge">🎵 Concerts</span>
+                <span class="hero-badge">🎟️ Live Events</span>
+            </div>
+            <h1>Experience Live Events &amp; Movies</h1>
+            <p>Book seats from real-time visual maps. Join waitlists for sold-out events and receive automatic ticket delivery.</p>
+        </section>
+
+        <!-- ====== TRENDING CAROUSEL ====== -->
+        <section class="trending-section">
+            <div class="trending-label">🔥 Trending Now</div>
+            <div class="carousel-container" id="carouselContainer">
+                <div class="carousel-slides-wrapper" id="carouselSlides">
+                    <!-- Slides injected by JS -->
+                    <div style="display:flex;align-items:center;justify-content:center;height:340px;color:var(--text-muted);">
+                        Loading trending events...
+                    </div>
+                </div>
+                <!-- Nav -->
+                <div class="carousel-nav">
+                    <button class="carousel-btn" id="prevBtn" onclick="moveSlide(-1)" title="Previous">&#8679;</button>
+                    <button class="carousel-btn" id="nextBtn" onclick="moveSlide(1)" title="Next">&#8681;</button>
+                </div>
+                <!-- Dots -->
+                <div class="carousel-dots" id="carouselDots"></div>
+            </div>
+        </section>
+
+        <!-- ====== SEARCH & FILTER ====== -->
+        <div class="search-filter-bar">
+            <input type="text" id="searchInput" class="form-control" placeholder="🔍  Search movies or concerts..." style="flex-grow: 2;">
+            <select id="typeFilter" class="form-control" style="flex-grow: 1;">
+                <option value="">All Categories</option>
+                <option value="movie">🎬 Movies</option>
+                <option value="concert">🎵 Concerts</option>
+            </select>
+            <button onclick="loadEvents()" class="btn btn-primary">Search</button>
+        </div>
+
+        <!-- ====== EVENTS GRID ====== -->
+        <div class="section-header">
+            <h2 class="section-title">Upcoming Events</h2>
+        </div>
+        <div id="eventsGrid" class="grid">
+            <div class="events-loading-msg">Loading events...</div>
+        </div>
+    </div>
+
+    <script src="/frontend/js/api.js"></script>
+    <script>
+        // ========= CAROUSEL STATE =========
+        let allEvents = [];
+        let carouselEvents = [];
+        let currentSlide = 0;
+        let carouselTimer = null;
+        const CAROUSEL_INTERVAL = 5000;
+        const POSTER_FALLBACKS = {
+            movie: 'poster-movie',
+            concert: 'poster-concert'
+        };
+
+        // ========= CAROUSEL FUNCTIONS =========
+        function buildCarousel(events) {
+            carouselEvents = events.slice(0, 5);
+            if (carouselEvents.length === 0) return;
+
+            const wrapper = document.getElementById('carouselSlides');
+            const dotsContainer = document.getElementById('carouselDots');
+
+            // Build slides
+            wrapper.innerHTML = carouselEvents.map((e, i) => {
+                const posterBg = POSTER_FALLBACKS[e.type] || 'poster-default';
+                const posterContent = e.poster_url
+                    ? `<img src="${e.poster_url}" alt="${e.title}" onerror="this.parentElement.innerHTML='<div class=\\'poster-placeholder ${posterBg}\\'><span style=\\'font-size:70px;\\'>${e.type === 'movie' ? '🎬' : '🎵'}</span></div>'">`
+                    : `<div class="poster-placeholder ${posterBg}" style="font-size:70px; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">${e.type === 'movie' ? '🎬' : '🎵'}</div>`;
+
+                const badgeIcon = e.type === 'movie' ? '🎬' : '🎵';
+                const shortDesc = (e.description || 'No description provided.').slice(0, 180);
+
+                return `
+                    <div class="carousel-slide ${i === 0 ? 'active' : ''}" id="slide-${i}" data-index="${i}">
+                        <div class="carousel-slide-poster">
+                            ${posterContent}
+                        </div>
+                        <div class="carousel-slide-info">
+                            <div class="carousel-badge ${e.type}">${badgeIcon} ${e.type.toUpperCase()}</div>
+                            <h2>${e.title}</h2>
+                            <p>${shortDesc}${e.description && e.description.length > 180 ? '…' : ''}</p>
+                            <a href="/frontend/pages/event-detail.html?id=${e.id}" class="btn btn-primary" style="width: fit-content;">
+                                View Showtimes &rarr;
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Build dots
+            dotsContainer.innerHTML = carouselEvents.map((_, i) =>
+                `<button class="carousel-dot ${i === 0 ? 'active' : ''}" onclick="goToSlide(${i})" title="Slide ${i + 1}"></button>`
+            ).join('');
+
+            startCarouselTimer();
+        }
+
+        function goToSlide(index) {
+            const slides = document.querySelectorAll('.carousel-slide');
+            const dots = document.querySelectorAll('.carousel-dot');
+            if (!slides.length) return;
+
+            // Exit current
+            slides[currentSlide].classList.remove('active');
+            slides[currentSlide].classList.add('exiting');
+            dots[currentSlide].classList.remove('active');
+
+            setTimeout(() => {
+                slides[currentSlide].classList.remove('exiting');
+                currentSlide = (index + carouselEvents.length) % carouselEvents.length;
+                slides[currentSlide].classList.add('active');
+                dots[currentSlide].classList.add('active');
+            }, 120);
+        }
+
+        function moveSlide(dir) {
+            resetCarouselTimer();
+            goToSlide(currentSlide + dir);
+        }
+
+        function startCarouselTimer() {
+            clearInterval(carouselTimer);
+            carouselTimer = setInterval(() => {
+                goToSlide(currentSlide + 1);
+            }, CAROUSEL_INTERVAL);
+        }
+
+        function resetCarouselTimer() {
+            clearInterval(carouselTimer);
+            startCarouselTimer();
+        }
+
+        // ========= EVENTS GRID =========
+        async function loadEvents() {
+            const grid = document.getElementById("eventsGrid");
+            const search = document.getElementById("searchInput").value;
+            const type = document.getElementById("typeFilter").value;
+
+            grid.innerHTML = `<div class="events-loading-msg">Searching...</div>`;
+
+            try {
+                let url = "/events";
+                const params = [];
+                if (search) params.push(`search=${encodeURIComponent(search)}`);
+                if (type)   params.push(`type=${encodeURIComponent(type)}`);
+                if (params.length > 0) url += `?${params.join("&")}`;
+
+                const events = await api.get(url);
+                allEvents = events;
+
+                // If first load, also build carousel
+                if (carouselEvents.length === 0 && events.length > 0) {
+                    buildCarousel(events);
+                }
+
+                if (events.length === 0) {
+                    grid.innerHTML = `<div class="events-loading-msg">No events found matching your search.</div>`;
+                    return;
+                }
+
+                grid.innerHTML = events.map(e => {
+                    const posterBg = POSTER_FALLBACKS[e.type] || 'poster-default';
+                    const posterHtml = e.poster_url
+                        ? `<img src="${e.poster_url}" alt="${e.title}" onerror="this.parentElement.classList.add('${posterBg}'); this.outerHTML='<span style=\\'font-size:52px;\\'>${e.type === 'movie' ? '🎬' : '🎵'}</span>'">`
+                        : `<div class="event-poster-placeholder ${posterBg}">
+                               <span style="font-size:52px;">${e.type === 'movie' ? '🎬' : '🎵'}</span>
+                           </div>`;
+
+                    return `
+                        <div class="event-card">
+                            <div class="event-poster ${!e.poster_url ? posterBg : ''}">
+                                ${posterHtml}
+                                <span class="event-tag ${e.type}">${e.type}</span>
+                            </div>
+                            <div class="event-details">
+                                <h3>${e.title}</h3>
+                                <p>${e.description || "No description provided."}</p>
+                                <a href="/frontend/pages/event-detail.html?id=${e.id}" class="btn btn-primary" style="justify-content: center; width: 100%;">
+                                    View Showtimes
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+            } catch (err) {
+                toast.error(err.message);
+                grid.innerHTML = `<div class="events-loading-msg" style="color: var(--danger);">Error loading events: ${err.message}</div>`;
+            }
+        }
+
+        // Allow pressing Enter in search box
+        document.addEventListener("DOMContentLoaded", () => {
+            loadEvents();
+            document.getElementById("searchInput").addEventListener("keyup", (e) => {
+                if (e.key === "Enter") loadEvents();
+            });
+        });
+    </script>
+</body>
+</html>

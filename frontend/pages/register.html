@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - TicketFlow</title>
+    <meta name="description" content="Create a free TicketFlow account to book movie and concert tickets.">
+    <link rel="stylesheet" href="/frontend/css/styles.css">
+    <style>
+        .auth-wrapper {
+            min-height: calc(100vh - 70px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 24px;
+        }
+        .auth-card { width: 100%; max-width: 480px; }
+        .auth-logo { text-align: center; margin-bottom: 28px; }
+        .auth-logo h2 {
+            font-size: 28px;
+            background: var(--primary-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+        .auth-logo p { color: var(--text-muted); font-size: 15px; }
+        .role-option-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .role-option {
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid var(--border-color);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+        }
+        .role-option:hover { border-color: var(--border-hover); background: var(--bg-inset); }
+        .role-option.selected { border-color: var(--primary); background: var(--bg-badge); color: var(--primary); font-weight: 600; }
+        .role-option .role-icon { font-size: 22px; display: block; margin-bottom: 4px; }
+    </style>
+</head>
+<body>
+    <header></header>
+
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <h2>🎟️ Create Account</h2>
+                <p>Join TicketFlow and start booking events</p>
+            </div>
+            <div class="card">
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="fullName">Full Name</label>
+                        <input type="text" id="fullName" class="form-control" placeholder="John Doe" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" class="form-control" placeholder="john@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password <span style="font-weight:400; text-transform:none;">(min. 6 characters)</span></label>
+                        <input type="password" id="password" class="form-control" placeholder="••••••••" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label>Register As</label>
+                        <div class="role-option-grid">
+                            <div class="role-option selected" data-role="customer" onclick="selectRole('customer', this)">
+                                <span class="role-icon">👤</span>Customer
+                            </div>
+                            <div class="role-option" data-role="organiser" onclick="selectRole('organiser', this)">
+                                <span class="role-icon">🎭</span>Organiser
+                            </div>
+                            <div class="role-option" data-role="admin" onclick="selectRole('admin', this)">
+                                <span class="role-icon">🛡️</span>Admin
+                            </div>
+                        </div>
+                        <input type="hidden" id="role" value="customer">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 4px; padding: 13px; font-size: 15px;">
+                        Create Account →
+                    </button>
+                </form>
+                <p style="text-align: center; color: var(--text-muted); font-size: 14px; margin-top: 20px;">
+                    Already have an account? <a href="/frontend/pages/login.html" style="color: var(--primary); font-weight: 700;">Log in here</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/frontend/js/api.js"></script>
+    <script>
+        function selectRole(role, el) {
+            document.querySelectorAll('.role-option').forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+            document.getElementById('role').value = role;
+        }
+
+        document.getElementById("registerForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const fullName = document.getElementById("fullName").value;
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            const role = document.getElementById("role").value;
+            try {
+                const res = await api.post("/auth/register", { email, password, full_name: fullName, role });
+                api.setUserDetails(res.access_token, res.role, res.name);
+                toast.success("Account created successfully!");
+                setTimeout(() => {
+                    if (role === "organiser") window.location.href = "/frontend/pages/organiser.html";
+                    else if (role === "admin") window.location.href = "/frontend/pages/admin.html";
+                    else window.location.href = "/frontend/index.html";
+                }, 900);
+            } catch (err) {
+                toast.error(err.message || "Registration failed");
+            }
+        });
+    </script>
+</body>
+</html>

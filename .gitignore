@@ -1,0 +1,21 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Database
+*.db
+ticket_booking.db
+
+# Environment variables
+.env
+
+# Local generated logs
+sent_emails/
+

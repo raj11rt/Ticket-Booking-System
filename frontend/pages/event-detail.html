@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Details - TicketFlow</title>
+    <meta name="description" content="View event details and available showtimes on TicketFlow.">
+    <link rel="stylesheet" href="/frontend/css/styles.css">
+    <style>
+        .event-hero-poster {
+            width: 130px;
+            height: 130px;
+            border-radius: 16px;
+            overflow: hidden;
+            flex-shrink: 0;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        }
+        .event-hero-poster img { width: 100%; height: 100%; object-fit: cover; }
+        .event-hero-icon {
+            width: 130px;
+            height: 130px;
+            border-radius: 16px;
+            background: var(--bg-inset);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            flex-shrink: 0;
+        }
+        .show-card-row {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            padding: 22px 28px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(109,40,217,0.05);
+        }
+        .show-card-row:hover {
+            border-color: var(--border-hover);
+            box-shadow: 0 6px 24px rgba(109,40,217,0.10);
+            transform: translateY(-2px);
+        }
+        .price-chip {
+            background: var(--bg-badge);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .price-chip strong { color: var(--primary); font-weight: 700; }
+    </style>
+</head>
+<body>
+    <header></header>
+
+    <div class="container">
+        <a href="/frontend/index.html" class="btn btn-secondary" style="margin-bottom: 28px;">← Back to Events</a>
+        
+        <!-- Event Info Card -->
+        <div id="eventContainer" class="card" style="margin-bottom: 40px; display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap;">
+            <div class="event-hero-icon" id="eventPosterWrap">
+                <span>🎬</span>
+            </div>
+            <div style="flex-grow: 1;">
+                <span id="eventTag" class="event-tag" style="position: static; margin-bottom: 12px; display: inline-block;"></span>
+                <h1 id="eventTitle" style="font-size: 32px; margin-bottom: 12px; line-height: 1.25;"></h1>
+                <p id="eventDescription" style="color: var(--text-muted); font-size: 16px; max-width: 620px; line-height: 1.65;"></p>
+            </div>
+        </div>
+
+        <div class="section-header">
+            <h2 class="section-title">Available Shows</h2>
+        </div>
+        <div id="showsList" style="display: flex; flex-direction: column; gap: 14px;">
+            <div class="card" style="text-align: center; color: var(--text-muted); padding: 48px;">
+                Loading showtimes...
+            </div>
+        </div>
+    </div>
+
+    <script src="/frontend/js/api.js"></script>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const eventId = urlParams.get("id");
+
+        async function loadEventDetails() {
+            if (!eventId) { toast.error("Event ID is missing"); return; }
+
+            try {
+                const event = await api.get(`/events/${eventId}`);
+                document.getElementById("eventTitle").innerText = event.title;
+                document.title = `${event.title} — TicketFlow`;
+
+                // Badge
+                const tag = document.getElementById("eventTag");
+                tag.innerText = event.type;
+                tag.className = `event-tag ${event.type}`;
+
+                document.getElementById("eventDescription").innerText = event.description || "No description provided.";
+
+                // Poster
+                const posterWrap = document.getElementById("eventPosterWrap");
+                if (event.poster_url) {
+                    posterWrap.className = "event-hero-poster";
+                    posterWrap.innerHTML = `<img src="${event.poster_url}" alt="${event.title}" onerror="this.parentElement.innerHTML='<span style=\\'font-size:60px;\\'>${event.type === 'movie' ? '🎬' : '🎵'}</span>'">`;
+                } else {
+                    posterWrap.innerHTML = `<span>${event.type === 'movie' ? '🎬' : '🎵'}</span>`;
+                }
+
+                // Shows
+                const shows = await api.get(`/events/${eventId}/shows`);
+                const showsList = document.getElementById("showsList");
+
+                if (shows.length === 0) {
+                    showsList.innerHTML = `
+                        <div class="card" style="text-align: center; color: var(--text-muted); padding: 48px;">
+                            No shows scheduled for this event yet.
+                        </div>`;
+                    return;
+                }
+
+                showsList.innerHTML = shows.map(s => {
+                    const pricesHtml = Object.entries(s.pricing)
+                        .map(([cat, val]) => `<span class="price-chip">${cat}: <strong>$${val.toFixed(2)}</strong></span>`)
+                        .join(" ");
+
+                    return `
+                        <div class="show-card-row">
+                            <div>
+                                <h3 style="font-size: 17px; margin-bottom: 8px; color: var(--text-main);">🏛️ ${s.venue_name}</h3>
+                                <div style="display: flex; gap: 16px; color: var(--text-muted); font-size: 14px; margin-bottom: 12px; flex-wrap: wrap;">
+                                    <span>📅 <strong style="color: var(--text-strong);">${s.date}</strong></span>
+                                    <span>⏰ <strong style="color: var(--text-strong);">${s.time}</strong></span>
+                                </div>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">${pricesHtml}</div>
+                            </div>
+                            <a href="/frontend/pages/seat-select.html?show_id=${s.id}" class="btn btn-primary">
+                                Select Seats →
+                            </a>
+                        </div>
+                    `;
+                }).join("");
+
+            } catch (err) {
+                toast.error("Error loading event: " + err.message);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => { loadEventDetails(); });
+    </script>
+</body>
+</html>

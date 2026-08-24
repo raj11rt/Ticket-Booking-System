@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - TicketFlow</title>
+    <meta name="description" content="Sign in to TicketFlow to book movie and concert tickets.">
+    <link rel="stylesheet" href="/frontend/css/styles.css">
+    <style>
+        .auth-wrapper {
+            min-height: calc(100vh - 70px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 24px;
+        }
+        .auth-card {
+            width: 100%;
+            max-width: 440px;
+        }
+        .auth-logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .auth-logo h2 {
+            font-size: 28px;
+            background: var(--primary-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
+        }
+        .auth-logo p { color: var(--text-muted); font-size: 15px; transition: all 0.3s ease; }
+        .divider {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+            margin: 20px 0;
+            position: relative;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 42%;
+            height: 1px;
+            background: var(--border-color);
+        }
+        .divider::before { left: 0; }
+        .divider::after { right: 0; }
+    </style>
+</head>
+<body>
+    <header></header>
+
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <h2 id="loginHeaderTitle">🎟️ Welcome Back</h2>
+                <p id="loginHeaderSub">Sign in to your TicketFlow account</p>
+            </div>
+            <div class="card">
+                <!-- Step 1: Password Form -->
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" class="form-control" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 8px; padding: 13px; font-size: 15px;">
+                        Sign In →
+                    </button>
+                </form>
+
+                <!-- Step 2: OTP Verification Form -->
+                <form id="otpForm" style="display: none;">
+                    <p style="color: var(--text-muted); font-size: 14px; line-height: 1.6; margin-bottom: 20px; text-align: center;">
+                        A 6-digit verification code has been sent to <strong id="otpEmailText" style="color: var(--text-main);"></strong>. Please enter it below.
+                    </p>
+                    <div class="form-group">
+                        <label for="otpCode" style="text-align: center; display: block;">Verification Code</label>
+                        <input type="text" id="otpCode" class="form-control" placeholder="••••••" maxlength="6" pattern="\d{6}" required
+                               style="text-align: center; font-size: 24px; letter-spacing: 12px; font-family: monospace; font-weight: bold; width: 100%; margin: 10px 0;">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 13px; font-size: 15px; margin-top: 10px;">
+                        Verify &amp; Login ✓
+                    </button>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; font-size: 13px;">
+                        <a href="#" onclick="backToPassword(event)" style="color: var(--text-muted); font-weight: 500;">← Back to login</a>
+                        <a href="#" id="resendBtn" onclick="resendOtp(event)" style="color: var(--primary); font-weight: 700;">Resend Code</a>
+                    </div>
+                </form>
+
+                <div class="divider">or</div>
+                <p id="signUpPrompt" style="text-align: center; color: var(--text-muted); font-size: 14px;">
+                    Don't have an account? <a href="/frontend/pages/register.html" style="color: var(--primary); font-weight: 700;">Sign up here</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/frontend/js/api.js"></script>
+    <script>
+        let tempEmail = "";
+        let tempPassword = "";
+
+        document.getElementById("loginForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            try {
+                const res = await api.post("/auth/login", { email, password });
+                
+                if (res.otp_required) {
+                    tempEmail = email;
+                    tempPassword = password;
+                    
+                    // Transition to OTP verification screen
+                    document.getElementById("loginForm").style.display = "none";
+                    document.querySelector(".divider").style.display = "none";
+                    document.getElementById("signUpPrompt").style.display = "none";
+                    
+                    document.getElementById("otpEmailText").innerText = email;
+                    document.getElementById("otpForm").style.display = "block";
+                    
+                    document.getElementById("loginHeaderTitle").innerText = "🔑 Security Code";
+                    document.getElementById("loginHeaderSub").innerText = "2-Step Verification Required";
+                    document.getElementById("otpCode").focus();
+                    
+                    toast.success("Verification code sent to your email!");
+                } else {
+                    completeLogin(res);
+                }
+            } catch (err) {
+                toast.error(err.message || "Invalid credentials");
+            }
+        });
+
+        document.getElementById("otpForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const otpCode = document.getElementById("otpCode").value;
+            try {
+                const res = await api.post("/auth/verify-otp", {
+                    email: tempEmail,
+                    otp_code: otpCode
+                });
+                completeLogin(res);
+            } catch (err) {
+                toast.error(err.message || "Invalid or expired verification code");
+            }
+        });
+
+        function completeLogin(res) {
+            api.setUserDetails(res.access_token, res.role, res.name);
+            toast.success("Welcome back!");
+            setTimeout(() => {
+                if (res.role === "organiser") window.location.href = "/frontend/pages/organiser.html";
+                else if (res.role === "admin") window.location.href = "/frontend/pages/admin.html";
+                else window.location.href = "/frontend/index.html";
+            }, 900);
+        }
+
+        function backToPassword(e) {
+            e.preventDefault();
+            document.getElementById("otpForm").style.display = "none";
+            document.getElementById("otpCode").value = "";
+            
+            document.getElementById("loginForm").style.display = "block";
+            document.querySelector(".divider").style.display = "block";
+            document.getElementById("signUpPrompt").style.display = "block";
+            
+            document.getElementById("loginHeaderTitle").innerText = "🎟️ Welcome Back";
+            document.getElementById("loginHeaderSub").innerText = "Sign in to your TicketFlow account";
+        }
+
+        async function resendOtp(e) {
+            e.preventDefault();
+            const resendBtn = document.getElementById("resendBtn");
+            
+            resendBtn.style.pointerEvents = "none";
+            resendBtn.style.opacity = "0.5";
+            resendBtn.innerText = "Sending...";
+            
+            try {
+                await api.post("/auth/login", { email: tempEmail, password: tempPassword });
+                toast.success("New verification code sent!");
+                
+                let seconds = 30;
+                const interval = setInterval(() => {
+                    seconds--;
+                    if (seconds <= 0) {
+                        clearInterval(interval);
+                        resendBtn.style.pointerEvents = "auto";
+                        resendBtn.style.opacity = "1";
+                        resendBtn.innerText = "Resend Code";
+                    } else {
+                        resendBtn.innerText = `Resend in ${seconds}s`;
+                    }
+                }, 1000);
+            } catch (err) {
+                toast.error(err.message || "Failed to resend code");
+                resendBtn.style.pointerEvents = "auto";
+                resendBtn.style.opacity = "1";
+                resendBtn.innerText = "Resend Code";
+            }
+        }
+    </script>
+</body>
+</html>
